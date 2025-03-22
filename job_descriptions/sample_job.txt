@@ -1,0 +1,30 @@
+Software Engineer Position
+
+We are looking for a skilled Software Engineer to join our team. The ideal candidate will have:
+
+Required Skills:
+- Strong programming skills in Python, JavaScript, and Java
+- Experience with modern web frameworks (React, Django, Flask)
+- Knowledge of database systems (SQL, MongoDB)
+- Understanding of cloud platforms (AWS, Azure)
+- Experience with version control (Git)
+- Strong problem-solving abilities
+- Excellent communication skills
+- Experience with agile development methodologies
+- Knowledge of CI/CD pipelines
+- Understanding of microservices architecture
+
+Responsibilities:
+- Develop and maintain web applications
+- Write clean, efficient, and well-documented code
+- Collaborate with cross-functional teams
+- Participate in code reviews
+- Debug and fix technical issues
+- Implement new features and improvements
+
+Qualifications:
+- Bachelor's degree in Computer Science or related field
+- 3+ years of professional software development experience
+- Strong understanding of software engineering principles
+- Experience with test-driven development
+- Ability to work independently and in a team environment 
