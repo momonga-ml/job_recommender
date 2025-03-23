@@ -1,71 +1,91 @@
-# Job Skills Analyzer and Resume Comparator
+# Job Recommender
 
-This tool helps analyze job descriptions and compare them against a resume to identify matching skills and areas for growth.
+A Python tool for scraping job descriptions from various job boards and analyzing resumes against job requirements.
 
 ## Features
 
-- Extracts and ranks important skills from multiple job descriptions
-- Analyzes a resume against the required skills (supports PDF and TXT formats)
-- Provides detailed recommendations for skill development
-- Uses OpenAI's GPT-4 for intelligent analysis
-- Flexible CLI interface with configurable options
+- Scrape job descriptions from multiple job boards:
+  - Indeed
+  - LinkedIn
+  - Glassdoor
+- Analyze resumes against job requirements
+- Extract key skills from job descriptions
+- Generate personalized recommendations for skill development
+- Support for both PDF and text resume formats
 
-## Setup
+## Installation
 
-1. Install the required dependencies:
+1. Clone the repository:
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/yourusername/job_recommender.git
+cd job_recommender
 ```
 
-2. Copy `example.env` to `.env` and add your OpenAI API key:
+2. Install the package:
 ```bash
-cp example.env .env
-```
-Then edit `.env` and add your OpenAI API key:
-```
-OPENAI_API_KEY=your_api_key_here
+pip install -e ".[dev]"  # Install with development dependencies for testing
 ```
 
-3. Create a `job_descriptions` folder and add your job description text files (`.txt` format)
-
-4. Place your resume in the `resumes` folder (supports both PDF and TXT formats)
+3. Set up your environment variables:
+```bash
+cp .env.example .env
+# Edit .env and add your OpenAI API key
+```
 
 ## Usage
 
-Basic usage:
+### Scraping Job Descriptions
+
 ```bash
-python job_analyzer.py --resume path/to/your/resume.pdf
+job-scraper --query "software engineer" --location "New York, NY" --num-jobs 20 --sites indeed linkedin
 ```
 
-Advanced options:
+### Analyzing Your Resume
+
 ```bash
-python job_analyzer.py \
-    --resume path/to/your/resume.pdf \
-    --job-folder custom/job/folder \
-    --max-skills 30 \
-    --model gpt-4-turbo-preview
+job-analyzer --job-folder job_descriptions --resume path/to/your/resume.pdf
 ```
 
-### Command Line Options
+## Development
 
-- `--resume`: Path to your resume file (PDF or TXT) [required]
-- `--job-folder`: Folder containing job descriptions (default: 'job_descriptions')
-- `--max-skills`: Maximum number of skills to analyze (default: 20)
-- `--model`: OpenAI model to use for analysis (default: 'gpt-4-turbo-preview')
+### Running Tests
 
-The tool will:
-1. Analyze all job descriptions in the specified folder
-2. Extract and rank the most important skills
-3. Compare your resume against these skills
-4. Provide a detailed analysis including:
-   - Matching skills
-   - Areas for growth
-   - Specific recommendations
+```bash
+# Run all tests
+pytest
 
-## File Structure
+# Run with coverage report
+pytest --cov=job_recommender
 
-- `job_descriptions/` - Folder containing job description text files
-- `resumes/` - Folder for storing resume files (PDF or TXT)
-- `.env` - OpenAI API key configuration (copy from example.env)
-- `job_analyzer.py` - Main script
-- `requirements.txt` - Project dependencies
+# Run only integration tests
+pytest -m integration
+```
+
+### Project Structure
+
+```
+job_recommender/
+├── job_recommender/
+│   ├── __init__.py
+│   ├── job_scraper.py
+│   └── job_analyzer.py
+├── tests/
+│   ├── __init__.py
+│   ├── test_job_scraper.py
+│   └── test_job_analyzer.py
+├── setup.py
+├── requirements.txt
+└── README.md
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
