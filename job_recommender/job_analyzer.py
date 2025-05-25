@@ -40,12 +40,27 @@ class JobAnalyzer:
 
     def extract_skills(self, descriptions: List[str]) -> Dict[str, float]:
         """Extract and rank skills from job descriptions using TF-IDF."""
-        # Fit and transform the descriptions
-        tfidf_matrix = self.vectorizer.fit_transform(descriptions)
+        if not descriptions:
+            logger.info("No descriptions provided to extract_skills, returning empty dict.")
+            return {}
+        
+        try:
+            # Fit and transform the descriptions
+            tfidf_matrix = self.vectorizer.fit_transform(descriptions)
+        except ValueError as e:
+            if "empty vocabulary" in str(e).lower(): # Make check case-insensitive
+                logger.warning(f"TF-IDF ValueError (empty vocabulary) for descriptions: {descriptions}. Returning empty skills dict.")
+                return {}
+            # Re-raise other ValueErrors if they are not the "empty vocabulary" one
+            logger.error(f"TF-IDF ValueError (other) for descriptions: {descriptions}. Error: {e}")
+            raise
         
         # Get feature names (words/phrases)
         feature_names = self.vectorizer.get_feature_names_out()
-        
+        if not feature_names.any(): # Check if feature_names is empty
+             logger.info("No features extracted by TF-IDF, returning empty skills dict.")
+             return {}
+
         # Calculate average TF-IDF scores across all documents
         avg_tfidf = tfidf_matrix.mean(axis=0).A1
         
@@ -53,6 +68,9 @@ class JobAnalyzer:
         skills_dict = dict(zip(feature_names, avg_tfidf))
         
         # Sort by score in descending order
+        if not skills_dict:
+            return {}
+        # No need for a try-except around sorting if skills_dict contains valid float scores
         return dict(sorted(skills_dict.items(), key=lambda x: x[1], reverse=True))
 
     def read_resume(self, resume_path: str) -> str:
@@ -111,8 +129,8 @@ def analyze_jobs_and_resume(job_folder: str, resume_path: str, max_skills: int =
     
     # Extract skills
     skills_dict = analyzer.extract_skills(descriptions)
-    click.echo("\nTop 10 Required Skills:")
-    for skill, score in list(skills_dict.items())[:10]:
+    click.echo(f"\nTop {analyzer.max_skills} Required Skills:") # Use analyzer.max_skills
+    for skill, score in list(skills_dict.items())[:analyzer.max_skills]: # Use analyzer.max_skills
         click.echo(f"- {skill}: {score:.2f}")
     
     # Read and analyze resume
