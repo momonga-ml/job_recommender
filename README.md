@@ -43,8 +43,17 @@ job-scraper --query "software engineer" --location "New York, NY" --num-jobs 20 
 ### Analyzing Your Resume
 
 ```bash
-job-analyzer --job-folder job_descriptions --resume path/to/your/resume.pdf
+job-analyzer --job-folder job_descriptions --resume path/to/your/resume.pdf -o results.json -f json
 ```
+
+**Options:**
+
+*   `--job-folder FOLDER_PATH`: Folder containing job description text files (defaults to `job_descriptions`).
+*   `--resume RESUME_PATH`: Path to your resume file (PDF or TXT, required).
+*   `--max-skills NUMBER`: Maximum number of skills to analyze (defaults to 20).
+*   `--model MODEL_NAME`: OpenAI model to use for analysis (defaults to `gpt-4-turbo-preview`).
+*   `-o, --output-file FILE_PATH`: Optional. Path to save the analysis results (e.g., results.json, report.md).
+*   `-f, --output-format FORMAT`: Optional. Format for the output file. Supported formats: `json`, `md`. Defaults to `json` if an output file is specified. If no output file is given, results are printed to the console.
 
 ## Development
 

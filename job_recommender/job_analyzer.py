@@ -12,9 +12,35 @@ from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 
 # Download required NLTK data
-nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('averaged_perceptron_tagger')
+# nltk.download('punkt') # Moved to a function
+# nltk.download('stopwords')
+# nltk.download('averaged_perceptron_tagger')
+
+def download_nltk_data():
+    """Download necessary NLTK data if not already present."""
+    # Check and download 'punkt'
+    try:
+        nltk.data.find('tokenizers/punkt.zip')
+    except nltk.downloader.DownloadError: # More specific exception
+        nltk.download('punkt', quiet=True)
+    except LookupError: # Fallback for other lookup failures
+        nltk.download('punkt', quiet=True)
+    
+    # Check and download 'stopwords'
+    try:
+        nltk.data.find('corpora/stopwords.zip')
+    except nltk.downloader.DownloadError:
+        nltk.download('stopwords', quiet=True)
+    except LookupError:
+        nltk.download('stopwords', quiet=True)
+        
+    # Check and download 'averaged_perceptron_tagger'
+    try:
+        nltk.data.find('taggers/averaged_perceptron_tagger.zip')
+    except nltk.downloader.DownloadError:
+        nltk.download('averaged_perceptron_tagger', quiet=True)
+    except LookupError:
+        nltk.download('averaged_perceptron_tagger', quiet=True)
 
 class JobAnalyzer:
     def __init__(self, max_skills: int = 20, model_name: str = "gpt-4-turbo-preview"):
@@ -97,44 +123,142 @@ Please provide a JSON response with the following structure:
 
         return json.loads(response.choices[0].message.content)
 
-def analyze_jobs_and_resume(job_folder: str, resume_path: str, max_skills: int = 20, model_name: str = "gpt-4-turbo-preview"):
+def format_results_to_markdown(results: dict) -> str:
+    """Formats the analysis results into a Markdown string."""
+    md_lines = ["# Job Analysis Report"]
+
+    if "error" in results:
+        md_lines.append("\n## Errors")
+        md_lines.append(f"- {results['error']}")
+        return "\n".join(md_lines)
+
+    if "top_skills" in results:
+        md_lines.append("\n## Top Required Skills")
+        for skill_info in results["top_skills"][:10]: # Display top 10 as per console output
+            md_lines.append(f"- {skill_info['skill']}: {skill_info['score']:.2f}")
+
+    if "resume_analysis_error" in results:
+        md_lines.append("\n## Resume Analysis")
+        md_lines.append(f"- Error: {results['resume_analysis_error']}")
+    elif "resume_analysis" in results:
+        analysis = results["resume_analysis"]
+        md_lines.append("\n## Resume Analysis")
+
+        if "matching_skills" in analysis and analysis["matching_skills"]:
+            md_lines.append("\n### Matching Skills")
+            for skill in analysis["matching_skills"]:
+                md_lines.append(f"- {skill}")
+        
+        if "missing_skills" in analysis and analysis["missing_skills"]:
+            md_lines.append("\n### Missing Skills (Areas for Growth)")
+            for skill in analysis["missing_skills"]:
+                md_lines.append(f"- {skill}")
+
+        if "recommendations" in analysis and analysis["recommendations"]:
+            md_lines.append("\n### Recommendations")
+            for rec in analysis["recommendations"]:
+                md_lines.append(f"- {rec}")
+                
+    return "\n".join(md_lines)
+
+def analyze_jobs_and_resume(job_folder: str, resume_path: str, max_skills: int = 20, model_name: str = "gpt-4-turbo-preview", output_file: str = None, output_format: str = None):
     """Main function to analyze jobs and resume."""
-    # Initialize the analyzer
     analyzer = JobAnalyzer(max_skills=max_skills, model_name=model_name)
-    
+    results = {}
+
     # Read job descriptions
     descriptions = analyzer.read_job_descriptions(job_folder)
     if not descriptions:
-        click.echo(f"No job descriptions found in '{job_folder}' folder.")
-        click.echo("Please add .txt files containing job descriptions to that folder.")
+        error_message = f"No job descriptions found in '{job_folder}' folder. Please add .txt files containing job descriptions to that folder."
+        results["error"] = error_message
+        if output_file:
+            # Determine format, default to 'json' if not specified
+            actual_format = 'json'
+            if output_format:
+                actual_format = output_format.lower()
+            
+            try:
+                with open(output_file, 'w', encoding='utf-8') as f:
+                    if actual_format == 'json':
+                        json.dump(results, f, indent=4)
+                        click.echo(f"Results (error) saved to {output_file} in json format.")
+                    elif actual_format == 'md':
+                        md_output = format_results_to_markdown(results)
+                        f.write(md_output)
+                        click.echo(f"Results (error) saved to {output_file} in md format.")
+                    else:
+                        # This case should ideally not be reached if click.Choice is effective
+                        # and output_format is None for default json.
+                        # However, as a fallback, we'll write JSON.
+                        json.dump(results, f, indent=4)
+                        click.echo(f"Results (error) saved to {output_file} in json format (defaulted due to unspecified or unknown format).")
+            except IOError as e:
+                click.echo(f"Error writing to file {output_file}: {str(e)}", err=True)
+        else:
+            click.echo(error_message)
         return
-    
+
     # Extract skills
     skills_dict = analyzer.extract_skills(descriptions)
-    click.echo("\nTop 10 Required Skills:")
-    for skill, score in list(skills_dict.items())[:10]:
-        click.echo(f"- {skill}: {score:.2f}")
-    
+    results["top_skills"] = [{"skill": skill, "score": float(f"{score:.2f}")} for skill, score in list(skills_dict.items())]
+
     # Read and analyze resume
     try:
         resume_text = analyzer.read_resume(resume_path)
         analysis = analyzer.analyze_resume(resume_text, skills_dict)
-        
-        # Print results
-        click.echo("\nResume Analysis Results:")
-        click.echo("\nMatching Skills:")
-        for skill in analysis['matching_skills']:
-            click.echo(f"- {skill}")
-        
-        click.echo("\nAreas for Growth:")
-        for skill in analysis['missing_skills']:
-            click.echo(f"- {skill}")
-        
-        click.echo("\nRecommendations:")
-        for rec in analysis['recommendations']:
-            click.echo(f"- {rec}")
+        results["resume_analysis"] = analysis
     except Exception as e:
-        click.echo(f"Error processing resume: {str(e)}", err=True)
+        error_message = f"Error processing resume: {str(e)}"
+        results["resume_analysis_error"] = error_message
+        # Decide if we should return or continue to write partial results
+        # For now, let's assume we write what we have so far
+
+    # Output logic
+    if output_file:
+        actual_format = 'json' # Default format
+        if output_format:
+            actual_format = output_format.lower()
+
+        try:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                if actual_format == 'json':
+                    json.dump(results, f, indent=4)
+                    click.echo(f"Results saved to {output_file} in json format.")
+                elif actual_format == 'md':
+                    md_output = format_results_to_markdown(results)
+                    f.write(md_output)
+                    click.echo(f"Results saved to {output_file} in md format.")
+                else:
+                    # This case should ideally not be reached due to click.Choice.
+                    # If it is, it means output_format was something unexpected.
+                    # We'll default to console output by setting output_file to None.
+                    click.echo(f"Unsupported output format: {actual_format}. Defaulting to console output.", err=True)
+                    output_file = None # Force console output
+        except IOError as e:
+            click.echo(f"Error writing to file {output_file}: {str(e)}", err=True)
+            output_file = None # Force console output on error as well
+
+    if not output_file: # This condition allows fallback or if no output_file was specified initially
+        click.echo("\nTop 10 Required Skills:")
+        for item in results.get("top_skills", [])[:10]: # Display only top 10 for console
+            click.echo(f"- {item['skill']}: {item['score']:.2f}")
+
+        if "resume_analysis_error" in results:
+            click.echo(f"\nError in resume analysis: {results['resume_analysis_error']}", err=True)
+        elif "resume_analysis" in results:
+            analysis_data = results["resume_analysis"]
+            click.echo("\nResume Analysis Results:")
+            click.echo("\nMatching Skills:")
+            for skill in analysis_data.get('matching_skills', []):
+                click.echo(f"- {skill}")
+            
+            click.echo("\nAreas for Growth:")
+            for skill in analysis_data.get('missing_skills', []):
+                click.echo(f"- {skill}")
+            
+            click.echo("\nRecommendations:")
+            for rec in analysis_data.get('recommendations', []):
+                click.echo(f"- {rec}")
 
 @click.command()
 @click.option('--job-folder', default='job_descriptions',
@@ -145,9 +269,15 @@ def analyze_jobs_and_resume(job_folder: str, resume_path: str, max_skills: int =
               help='Maximum number of skills to analyze')
 @click.option('--model', default='gpt-4-turbo-preview',
               help='OpenAI model to use for analysis')
-def main(job_folder: str, resume: str, max_skills: int, model: str):
+@click.option('--output-file', '-o', default=None, required=False, type=str,
+              help='Path to the output file (e.g., results.json, report.md).')
+@click.option('--output-format', '-f', default=None, required=False,
+              type=click.Choice(['json', 'md'], case_sensitive=False),
+              help='Format for the output file (json or md).')
+def main(job_folder: str, resume: str, max_skills: int, model: str, output_file: str, output_format: str):
     """Job Skills Analyzer and Resume Comparator CLI tool."""
-    analyze_jobs_and_resume(job_folder, resume, max_skills, model)
+    download_nltk_data()  # Ensure NLTK data is available before analysis
+    analyze_jobs_and_resume(job_folder, resume, max_skills, model, output_file, output_format)
 
 if __name__ == "__main__":
     main() 
