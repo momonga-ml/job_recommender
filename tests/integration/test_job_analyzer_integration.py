@@ -43,9 +43,11 @@ def temp_resume(tmp_path):
 
 @pytest.mark.integration
 def test_full_analysis_process(temp_job_descriptions, temp_resume):
-    #Integration test for the complete analysis process.
+    # Integration test for the complete analysis process.
     # This test will make a real OpenAI API call.
     # Ensure OPENAI_API_KEY is set in the environment.
+    if not os.getenv('OPENAI_API_KEY'):
+        pytest.skip("Skipping test: OPENAI_API_KEY is not set in the environment.")
     
     # Test the CLI interface
     with patch('click.echo') as mock_echo:
