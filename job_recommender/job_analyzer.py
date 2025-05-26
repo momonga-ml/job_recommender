@@ -1,9 +1,13 @@
 import os
 import json
 import click
-from typing import List, Dict
+from typing import List, Dict, Optional # Added Optional
 from collections import Counter
 import nltk
+
+from sqlalchemy.orm import sessionmaker
+from .db_schema import JobDetails
+from .db_utils import create_db_engine
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -17,9 +21,11 @@ nltk.download('stopwords')
 nltk.download('averaged_perceptron_tagger')
 
 class JobAnalyzer:
-    def __init__(self, max_skills: int = 20, model_name: str = "gpt-4-turbo-preview"):
+    def __init__(self, max_skills: int = 20, model_name: str = "gpt-4-turbo-preview", engine=None):
         load_dotenv()
         self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        self.engine = engine or create_db_engine()
+        self.Session = sessionmaker(bind=self.engine)
         self.stop_words = set(stopwords.words('english'))
         self.vectorizer = TfidfVectorizer(
             max_features=100,
@@ -29,13 +35,25 @@ class JobAnalyzer:
         self.max_skills = max_skills
         self.model_name = model_name
 
-    def read_job_descriptions(self, folder_path: str) -> List[str]:
-        """Read all job descriptions from a folder."""
+    def read_job_descriptions(self, job_ids: Optional[List[str]] = None) -> List[str]:
+        """Read job descriptions from the database."""
+        session = self.Session()
         descriptions = []
-        for filename in os.listdir(folder_path):
-            if filename.endswith('.txt'):
-                with open(os.path.join(folder_path, filename), 'r', encoding='utf-8') as f:
-                    descriptions.append(f.read())
+        try:
+            query = session.query(JobDetails.description)
+            if job_ids:
+                # Assuming job_ids are URLs for now, as per typical usage context
+                # If they are primary keys (JobDetails.job_id), this filter needs adjustment.
+                query = query.filter(JobDetails.url.in_(job_ids))
+            
+            results = query.all()
+            descriptions = [row.description for row in results if row.description] # Ensure description is not None
+            if not descriptions:
+                click.echo("No job descriptions found in the database matching the criteria.", err=True)
+        except Exception as e:
+            click.echo(f"Error reading job descriptions from database: {e}", err=True)
+        finally:
+            session.close()
         return descriptions
 
     def extract_skills(self, descriptions: List[str]) -> Dict[str, float]:
@@ -97,16 +115,17 @@ Please provide a JSON response with the following structure:
 
         return json.loads(response.choices[0].message.content)
 
-def analyze_jobs_and_resume(job_folder: str, resume_path: str, max_skills: int = 20, model_name: str = "gpt-4-turbo-preview"):
+def analyze_jobs_and_resume(resume_path: str, max_skills: int = 20, model_name: str = "gpt-4-turbo-preview", job_ids: Optional[List[str]] = None):
     """Main function to analyze jobs and resume."""
-    # Initialize the analyzer
+    # Initialize the analyzer (engine will be created by default if not passed)
     analyzer = JobAnalyzer(max_skills=max_skills, model_name=model_name)
     
-    # Read job descriptions
-    descriptions = analyzer.read_job_descriptions(job_folder)
+    # Read job descriptions from database
+    # Pass job_ids if provided, otherwise it fetches all (or based on default behavior in read_job_descriptions)
+    descriptions = analyzer.read_job_descriptions(job_ids=job_ids)
     if not descriptions:
-        click.echo(f"No job descriptions found in '{job_folder}' folder.")
-        click.echo("Please add .txt files containing job descriptions to that folder.")
+        # Error messages are now handled within read_job_descriptions or if it returns empty.
+        # click.echo("No job descriptions found to analyze.") # Redundant if read_job_descriptions handles it
         return
     
     # Extract skills
@@ -137,17 +156,19 @@ def analyze_jobs_and_resume(job_folder: str, resume_path: str, max_skills: int =
         click.echo(f"Error processing resume: {str(e)}", err=True)
 
 @click.command()
-@click.option('--job-folder', default='job_descriptions',
-              help='Folder containing job description text files')
+# Removed --job-folder option
 @click.option('--resume', required=True,
               help='Path to resume file (PDF or TXT)')
 @click.option('--max-skills', default=20,
               help='Maximum number of skills to analyze')
 @click.option('--model', default='gpt-4-turbo-preview',
               help='OpenAI model to use for analysis')
-def main(job_folder: str, resume: str, max_skills: int, model: str):
+@click.option('--job-ids', default=None, multiple=True, help='Optional list of job URLs to analyze. If not provided, analyzes all jobs.')
+def main(resume: str, max_skills: int, model: str, job_ids: Optional[List[str]]):
     """Job Skills Analyzer and Resume Comparator CLI tool."""
-    analyze_jobs_and_resume(job_folder, resume, max_skills, model)
+    # Convert tuple from multiple=True to list, or None if empty
+    job_ids_list = list(job_ids) if job_ids else None
+    analyze_jobs_and_resume(resume, max_skills, model, job_ids=job_ids_list)
 
 if __name__ == "__main__":
     main() 
