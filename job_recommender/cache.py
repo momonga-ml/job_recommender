@@ -195,7 +195,7 @@ class JobCache:
         """
         files_cleared_count = 0
         try:
-            if not site and not query and not location:
+            if not (site or query or location):
                 # Clear all cache files
                 for filename in os.listdir(self.cache_dir):
                     if filename.endswith('.json'):
