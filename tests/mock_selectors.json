@@ -1,0 +1,58 @@
+{
+  "indeed": {
+    "job_card": "mock_indeed_job_card",
+    "title": "mock_indeed_title",
+    "company": "mock_indeed_company",
+    "location": "mock_indeed_location",
+    "description": "mock_indeed_description",
+    "date_posted": "mock_indeed_date_posted",
+    "salary_range": "mock_indeed_salary_range",
+    "job_type": "mock_indeed_job_type",
+    "location_granular": "mock_indeed_location_granular",
+    "skills": "mock_indeed_skills_item",
+    "next_page_button": "mock_indeed_next_button",
+    "color": "magenta"
+  },
+  "linkedin": {
+    "job_card": "mock_linkedin_job_card",
+    "title": "mock_linkedin_title",
+    "company": "mock_linkedin_company",
+    "location": "mock_linkedin_location",
+    "description": "mock_linkedin_description",
+    "date_posted": "mock_linkedin_date_posted",
+    "salary_range": "mock_linkedin_salary_range",
+    "job_type": "mock_linkedin_job_type",
+    "location_granular": "mock_linkedin_location_granular",
+    "skills": "mock_linkedin_skills_item",
+    "next_page_button": "mock_linkedin_next_button",
+    "color": "cyan"
+  },
+  "glassdoor": {
+    "job_card": "mock_glassdoor_job_card",
+    "title": "mock_glassdoor_title",
+    "company": "mock_glassdoor_company",
+    "location": "mock_glassdoor_location",
+    "description": "mock_glassdoor_description",
+    "date_posted": "mock_glassdoor_date_posted",
+    "salary_range": "mock_glassdoor_salary_range",
+    "job_type": "mock_glassdoor_job_type",
+    "location_granular": "mock_glassdoor_location_granular",
+    "skills": "mock_glassdoor_skills_item",
+    "next_page_button": "mock_glassdoor_next_button",
+    "color": "yellow"
+  },
+  "testscraper": {
+    "job_card": "mock_test_job_card",
+    "title": "mock_test_title",
+    "company": "mock_test_company",
+    "location": "mock_test_location",
+    "description": "mock_test_description",
+    "date_posted": "mock_test_date_posted",
+    "salary_range": "mock_test_salary_range",
+    "job_type": "mock_test_job_type",
+    "location_granular": "mock_test_location_granular",
+    "skills": "mock_test_skills_item",
+    "next_page_button": "mock_test_next_button",
+    "color": "blue"
+  }
+}

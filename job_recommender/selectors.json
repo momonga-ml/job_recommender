@@ -1,0 +1,44 @@
+{
+  "indeed": {
+    "job_card": "job_seen_beacon",
+    "title": "jobsearch-JobInfoHeader-title",
+    "company": "jobsearch-CompanyInfoContainer",
+    "location": "jobsearch-JobInfoHeader-subtitle div:nth-child(2) div",
+    "description": "jobDescriptionText",
+    "date_posted": "span[class*='date'], div[class*='job-age'], span[id*='posted-date']",
+    "apply_link": "jobsearch-IndeedApplyButton-button",
+    "next_page_button": "a[data-testid='pagination-page-next'], a[aria-label='Next Page'], nav[role='navigation'] a[aria-label*='Next']",
+    "salary_range": "div[id='salaryInfoAndJobType'] span[class*='salary'], div[class*='salary-snippet'], span[data-testid='estimated-salary']",
+    "job_type": "div[id='salaryInfoAndJobType'] span[class*='jobtype'], div[class*='job-type'], span[data-testid='job-type']",
+    "location_granular": "div[data-testid='job-location'], div[class*='job-location-raw']",
+    "skills": "div[id='jobDetailsSection'] ul li, div.job-description-skills span.skill"
+  },
+  "linkedin": {
+    "job_card": "job-card-container",
+    "title": "jobs-unified-top-card__job-title",
+    "company": "jobs-unified-top-card__company-name",
+    "location": "jobs-unified-top-card__bullet",
+    "description": "jobs-description__content",
+    "date_posted": "span.jobs-unified-top-card__posted-date, time[datetime]",
+    "apply_link": "jobs-apply-button",
+    "next_page_button": "button[aria-label='See more jobs'], button[aria-label*='Next']",
+    "salary_range": "span[class*='salary'], div[class*='compensation'] span, li[class*='salary-range']",
+    "job_type": "li[class*='job-type'], span[class*='employment-status'], span[aria-label*='Job type']",
+    "location_granular": "span.jobs-unified-top-card__location-primary, span[class*='job-location']",
+    "skills": "ul.job-details-skill-match-status-list li, div.job-details-skills a"
+  },
+  "glassdoor": {
+    "job_card": "jobCard",
+    "title": "job-title",
+    "company": "employer-name",
+    "location": "location",
+    "description": "jobDescriptionContent",
+    "date_posted": "div[data-test='job-age'], span[class*='posted-date']",
+    "apply_link": "applyButton",
+    "next_page_button": "button[data-test='pagination-next'], button[aria-label*='Next']",
+    "salary_range": "span[data-test='detailSalary'], div[class*='salary']",
+    "job_type": "span[data-test='detailJobType'], div[class*='job-type']",
+    "location_granular": "div[data-test='location'], span[class*='job-location-precise']",
+    "skills": "div[class*='skill'], div[id='JobDescription'] ul li"
+  }
+}
