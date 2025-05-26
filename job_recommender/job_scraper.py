@@ -30,6 +30,7 @@ from .rich_utils import (
     print_error,
     print_info
 )
+# from .parallel_scraper import ParallelJobScraper # Moved to main() to break circular import
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -406,6 +407,7 @@ def get_scraper(site: str) -> Optional[BaseJobScraper]:
 @click.option('--clear-cache-site', help='Clear cache for a specific site')
 def main(ctx):
     """Scrape job descriptions from multiple job sites and save them to text files."""
+    from .parallel_scraper import ParallelJobScraper # Moved import here
     # Set up logging level
     logging.getLogger().setLevel(getattr(logging, ctx.params['log_level'].upper()))
     
