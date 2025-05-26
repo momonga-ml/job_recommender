@@ -194,7 +194,7 @@ def analyze_jobs_and_resume(job_folder: str, resume_path: str, max_skills: int =
 
     # Extract skills
     skills_dict = analyzer.extract_skills(descriptions)
-    results["top_skills"] = [{"skill": skill, "score": float(f"{score:.2f}")} for skill, score in list(skills_dict.items())]
+    results["top_skills"] = [{"skill": skill, "score": score} for skill, score in list(skills_dict.items())]
 
     # Read and analyze resume
     try:
