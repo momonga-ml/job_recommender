@@ -23,7 +23,7 @@ SKILLS
 
 @pytest.fixture
 def temp_job_descriptions(tmp_path):
-    #Create temporary job description files.
+    # Create temporary job description files.
     job_dir = tmp_path / "test_job_descriptions"
     job_dir.mkdir()
     
