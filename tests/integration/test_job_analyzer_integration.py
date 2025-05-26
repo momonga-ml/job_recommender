@@ -1,5 +1,4 @@
 import os
-import json
 import pytest
 from unittest.mock import patch # Keep patch for mocking click.echo
 from job_recommender.job_analyzer import main
