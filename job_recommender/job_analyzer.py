@@ -21,25 +21,19 @@ def download_nltk_data():
     # Check and download 'punkt'
     try:
         nltk.data.find('tokenizers/punkt.zip')
-    except nltk.downloader.DownloadError: # More specific exception
-        nltk.download('punkt', quiet=True)
-    except LookupError: # Fallback for other lookup failures
+    except LookupError: # Handle resource not found
         nltk.download('punkt', quiet=True)
     
     # Check and download 'stopwords'
     try:
         nltk.data.find('corpora/stopwords.zip')
-    except nltk.downloader.DownloadError:
-        nltk.download('stopwords', quiet=True)
-    except LookupError:
+    except LookupError: # Handle resource not found
         nltk.download('stopwords', quiet=True)
         
     # Check and download 'averaged_perceptron_tagger'
     try:
         nltk.data.find('taggers/averaged_perceptron_tagger.zip')
-    except nltk.downloader.DownloadError:
-        nltk.download('averaged_perceptron_tagger', quiet=True)
-    except LookupError:
+    except LookupError: # Handle resource not found
         nltk.download('averaged_perceptron_tagger', quiet=True)
 
 class JobAnalyzer:
