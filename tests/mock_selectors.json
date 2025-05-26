@@ -42,6 +42,17 @@
     "color": "yellow"
   },
   "testscraper": {
-    "job_card": "mock_test_job_card"
+    "job_card": "mock_test_job_card",
+    "title": "mock_test_title",
+    "company": "mock_test_company",
+    "location": "mock_test_location",
+    "description": "mock_test_description",
+    "date_posted": "mock_test_date_posted",
+    "salary_range": "mock_test_salary_range",
+    "job_type": "mock_test_job_type",
+    "location_granular": "mock_test_location_granular",
+    "skills": "mock_test_skills_item",
+    "next_page_button": "mock_test_next_button",
+    "color": "blue"
   }
 }
