@@ -30,7 +30,6 @@ from .rich_utils import (
     print_error,
     print_info
 )
-# from .parallel_scraper import ParallelJobScraper # Moved to main() to break circular import
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
