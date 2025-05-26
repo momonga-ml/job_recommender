@@ -14,7 +14,7 @@ from .rich_utils import (
     print_scraping_start,
     print_scraping_complete
 )
-from rich.progress import Progress # Added import
+# Removed unused import
 
 logger = logging.getLogger(__name__)
 
