@@ -135,7 +135,7 @@ class TestJobAnalyzer:
         assert "SKILLS" in resume_text
         assert "Python" in resume_text
 
-    def test_analyze_resume(self, mock_openai, temp_job_descriptions):
+    def test_analyze_resume_pdf(self, mock_openai, temp_job_descriptions):
         mock_page = MagicMock()
         mock_page.extract_text.return_value = SAMPLE_RESUME
         mock_pdf_reader.return_value.pages = [mock_page]
