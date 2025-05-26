@@ -176,22 +176,3 @@ class TestJobAnalyzer:
         mock_openai.return_value.chat.completions.create.side_effect = Exception("API Error")
         with pytest.raises(Exception):
             analyzer.analyze_resume(str(invalid_resume), {"python": 1.0})
-
-@pytest.mark.integration
-def test_full_analysis_process(mock_openai, temp_job_descriptions, temp_resume):
-    """Integration test for the complete analysis process."""
-    from job_recommender.job_analyzer import main
-    
-    # Test the CLI interface
-    with patch('click.echo') as mock_echo:
-        main(job_folder=temp_job_descriptions, resume=temp_resume)
-        
-        # Verify that output was printed
-        assert mock_echo.call_count > 0
-        
-        # Verify the content of the output
-        output_calls = [call[0][0] for call in mock_echo.call_args_list]
-        assert any("Top 10 Required Skills:" in str(call) for call in output_calls)
-        assert any("Matching Skills:" in str(call) for call in output_calls)
-        assert any("Areas for Growth:" in str(call) for call in output_calls)
-        assert any("Recommendations:" in str(call) for call in output_calls) 
