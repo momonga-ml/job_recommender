@@ -3,13 +3,8 @@ import argparse
 import logging
 import sys
 
-# Assuming JobCache is in a sibling module 'cache.py'
-try:
-    from cache import JobCache
-except ImportError:
-    # This is to make the script runnable for development/testing if job_recommender is not in PYTHONPATH
-    sys.path.append('.') 
-    from job_recommender.cache import JobCache
+# Explicitly import JobCache from the job_recommender.cache module
+from job_recommender.cache import JobCache
 
 
 # Configure basic logging to stdout
