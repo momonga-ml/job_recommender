@@ -128,9 +128,8 @@ class BaseJobScraper(ABC):
                         raw_search_hash=current_search_hash
                     )
                     session.add(job_to_save)
-                    session.commit() # Commit per job
                     saved_count += 1
-                    logger.info(f"Successfully saved job: {job_dict.get('title')} from {job_dict.get('site')}")
+                    logger.info(f"Successfully prepared job for saving: {job_dict.get('title')} from {job_dict.get('site')}")
 
                 except IntegrityError as e:
                     session.rollback()
