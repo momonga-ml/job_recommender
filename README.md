@@ -32,6 +32,32 @@ cp .env.example .env
 # Edit .env and add your OpenAI API key
 ```
 
+## Development Setup
+
+We use `uv` for fast Python package management.
+
+1.  Install `uv` (if you haven't already):
+    ```bash
+    pip install uv
+    ```
+2.  Create a virtual environment:
+    ```bash
+    uv venv
+    ```
+3.  Activate the virtual environment:
+    ```bash
+    source .venv/bin/activate
+    # Or on Windows: .venv\Scripts\activate
+    ```
+4.  Install runtime dependencies:
+    ```bash
+    uv pip install -r requirements.txt
+    ```
+5.  Install development dependencies:
+    ```bash
+    uv pip install -r requirements-dev.txt
+    ```
+
 ## Usage
 
 ### Scraping Job Descriptions

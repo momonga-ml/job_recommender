@@ -14,6 +14,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from bs4 import BeautifulSoup
 import logging
 from .utils import (
     retry_on_exception,
@@ -75,6 +76,11 @@ class BaseJobScraper(ABC):
     @handle_rate_limit
     def scrape_jobs(self, search_query: str, location: str, num_jobs: int) -> List[Dict]:
         """Scrape jobs from the specific job site."""
+        pass
+
+    @abstractmethod
+    def parse_job_details_page(self, html_content: str) -> Optional[Dict]:
+        """Parse the HTML content of a job details page."""
         pass
     
     def save_jobs(self, jobs: List[Dict]):
@@ -151,40 +157,20 @@ class IndeedScraper(BaseJobScraper):
                         # Wait for job details to load
                         wait.until(EC.presence_of_element_located((By.CLASS_NAME, "jobsearch-JobInfoHeader-title")))
                         
-                        # Extract job details with error handling
-                        try:
-                            title = self.driver.find_element(By.CLASS_NAME, "jobsearch-JobInfoHeader-title").text
-                        except NoSuchElementException:
-                            print_warning("Could not find job title, skipping...")
+                        job_details_html = self.driver.page_source
+                        job_data = self.parse_job_details_page(job_details_html)
+                        
+                        if job_data:
+                            job_data["url"] = self.driver.current_url
+                            job_data["scraped_date"] = datetime.now().isoformat()
+                            job_data["id"] = self.driver.current_url.split("?")[0].split("/")[-1] # Keep ID generation for now
+                            jobs.append(job_data)
+                            print_success(f"Successfully scraped job: {job_data['title']} at {job_data['company']}")
+                        else:
+                            print_warning("Failed to parse job details, skipping...")
                             progress.update(task_id, completed=1)
                             continue
-                            
-                        try:
-                            company = self.driver.find_element(By.CLASS_NAME, "jobsearch-CompanyInfoContainer").text
-                        except NoSuchElementException:
-                            company = "Unknown Company"
-                            print_warning("Could not find company name, using placeholder")
-                            
-                        try:
-                            description = self.driver.find_element(By.ID, "jobDescriptionText").text
-                        except NoSuchElementException:
-                            print_warning("Could not find job description, skipping...")
-                            progress.update(task_id, completed=1)
-                            continue
-                            
-                        job_id = self.driver.current_url.split("?")[0].split("/")[-1]
                         
-                        jobs.append({
-                            "site": "indeed",
-                            "id": job_id,
-                            "title": title,
-                            "company": company,
-                            "description": description,
-                            "url": self.driver.current_url,
-                            "scraped_date": datetime.now().isoformat()
-                        })
-                        
-                        print_success(f"Successfully scraped job: {title} at {company}")
                         progress.update(task_id, completed=1, count=f"{len(jobs)}/{min(len(job_cards), num_jobs)}")
                         
                     except Exception as e:
@@ -200,6 +186,39 @@ class IndeedScraper(BaseJobScraper):
         except Exception as e:
             print_error(f"Unexpected error while scraping Indeed: {str(e)}")
             raise ScraperError(f"Indeed scraping failed: {str(e)}")
+
+    def parse_job_details_page(self, html_content: str) -> Optional[Dict]:
+        """Parse the HTML content of an Indeed job details page."""
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            title_element = soup.find(class_="jobsearch-JobInfoHeader-title")
+            title = title_element.text.strip() if title_element else "Unknown Title"
+            if title == "Unknown Title":
+                logger.warning("Could not find job title in HTML")
+                return None
+
+            company_element = soup.find(class_="jobsearch-CompanyInfoContainer")
+            company = company_element.text.strip() if company_element else "Unknown Company"
+            if company == "Unknown Company":
+                 logger.warning("Could not find company name in HTML, using placeholder")
+
+
+            description_element = soup.find(id="jobDescriptionText")
+            description = description_element.text.strip() if description_element else "No description available"
+            if description == "No description available":
+                logger.warning("Could not find job description in HTML")
+                return None
+                
+            return {
+                "site": "indeed",
+                "title": title,
+                "company": company,
+                "description": description,
+            }
+        except Exception as e:
+            logger.error(f"Error parsing Indeed job details HTML: {str(e)}")
+            return None
 
 class LinkedInScraper(BaseJobScraper):
     @retry_on_exception(max_retries=3, delay=2.0)
@@ -242,40 +261,19 @@ class LinkedInScraper(BaseJobScraper):
                         # Wait for job details to load
                         wait.until(EC.presence_of_element_located((By.CLASS_NAME, "jobs-unified-top-card__job-title")))
                         
-                        # Extract job details with error handling
-                        try:
-                            title = self.driver.find_element(By.CLASS_NAME, "jobs-unified-top-card__job-title").text
-                        except NoSuchElementException:
-                            print_warning("Could not find job title, skipping...")
+                        job_details_html = self.driver.page_source
+                        job_data = self.parse_job_details_page(job_details_html)
+
+                        if job_data:
+                            job_data["url"] = self.driver.current_url
+                            job_data["scraped_date"] = datetime.now().isoformat()
+                            job_data["id"] = self.driver.current_url.split("?")[0].split("/")[-1] # Keep ID generation for now
+                            jobs.append(job_data)
+                            print_success(f"Successfully scraped job: {job_data['title']} at {job_data['company']}")
+                        else:
+                            print_warning("Failed to parse job details, skipping...")
                             progress.update(task_id, completed=1)
                             continue
-                            
-                        try:
-                            company = self.driver.find_element(By.CLASS_NAME, "jobs-unified-top-card__company-name").text
-                        except NoSuchElementException:
-                            company = "Unknown Company"
-                            print_warning("Could not find company name, using placeholder")
-                            
-                        try:
-                            description = self.driver.find_element(By.CLASS_NAME, "jobs-description__content").text
-                        except NoSuchElementException:
-                            print_warning("Could not find job description, skipping...")
-                            progress.update(task_id, completed=1)
-                            continue
-                            
-                        job_id = self.driver.current_url.split("?")[0].split("/")[-1]
-                        
-                        jobs.append({
-                            "site": "linkedin",
-                            "id": job_id,
-                            "title": title,
-                            "company": company,
-                            "description": description,
-                            "url": self.driver.current_url,
-                            "scraped_date": datetime.now().isoformat()
-                        })
-                        
-                        print_success(f"Successfully scraped job: {title} at {company}")
                         progress.update(task_id, completed=1, count=f"{len(jobs)}/{min(len(job_cards), num_jobs)}")
                         
                     except Exception as e:
@@ -291,6 +289,38 @@ class LinkedInScraper(BaseJobScraper):
         except Exception as e:
             print_error(f"Unexpected error while scraping LinkedIn: {str(e)}")
             raise ScraperError(f"LinkedIn scraping failed: {str(e)}")
+
+    def parse_job_details_page(self, html_content: str) -> Optional[Dict]:
+        """Parse the HTML content of a LinkedIn job details page."""
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+
+            title_element = soup.find(class_="jobs-unified-top-card__job-title")
+            title = title_element.text.strip() if title_element else "Unknown Title"
+            if title == "Unknown Title":
+                logger.warning("Could not find job title in HTML")
+                return None
+
+            company_element = soup.find(class_="jobs-unified-top-card__company-name")
+            company = company_element.text.strip() if company_element else "Unknown Company"
+            if company == "Unknown Company":
+                logger.warning("Could not find company name in HTML, using placeholder")
+
+            description_element = soup.find(class_="jobs-description__content")
+            description = description_element.text.strip() if description_element else "No description available"
+            if description == "No description available":
+                logger.warning("Could not find job description in HTML")
+                return None
+
+            return {
+                "site": "linkedin",
+                "title": title,
+                "company": company,
+                "description": description,
+            }
+        except Exception as e:
+            logger.error(f"Error parsing LinkedIn job details HTML: {str(e)}")
+            return None
 
 class GlassdoorScraper(BaseJobScraper):
     @retry_on_exception(max_retries=3, delay=2.0)
@@ -333,40 +363,19 @@ class GlassdoorScraper(BaseJobScraper):
                         # Wait for job details to load
                         wait.until(EC.presence_of_element_located((By.CLASS_NAME, "job-title")))
                         
-                        # Extract job details with error handling
-                        try:
-                            title = self.driver.find_element(By.CLASS_NAME, "job-title").text
-                        except NoSuchElementException:
-                            print_warning("Could not find job title, skipping...")
+                        job_details_html = self.driver.page_source
+                        job_data = self.parse_job_details_page(job_details_html)
+
+                        if job_data:
+                            job_data["url"] = self.driver.current_url
+                            job_data["scraped_date"] = datetime.now().isoformat()
+                            job_data["id"] = self.driver.current_url.split("?")[0].split("/")[-1] # Keep ID generation for now
+                            jobs.append(job_data)
+                            print_success(f"Successfully scraped job: {job_data['title']} at {job_data['company']}")
+                        else:
+                            print_warning("Failed to parse job details, skipping...")
                             progress.update(task_id, completed=1)
                             continue
-                            
-                        try:
-                            company = self.driver.find_element(By.CLASS_NAME, "employer-name").text
-                        except NoSuchElementException:
-                            company = "Unknown Company"
-                            print_warning("Could not find company name, using placeholder")
-                            
-                        try:
-                            description = self.driver.find_element(By.CLASS_NAME, "jobDescriptionContent").text
-                        except NoSuchElementException:
-                            print_warning("Could not find job description, skipping...")
-                            progress.update(task_id, completed=1)
-                            continue
-                            
-                        job_id = self.driver.current_url.split("?")[0].split("/")[-1]
-                        
-                        jobs.append({
-                            "site": "glassdoor",
-                            "id": job_id,
-                            "title": title,
-                            "company": company,
-                            "description": description,
-                            "url": self.driver.current_url,
-                            "scraped_date": datetime.now().isoformat()
-                        })
-                        
-                        print_success(f"Successfully scraped job: {title} at {company}")
                         progress.update(task_id, completed=1, count=f"{len(jobs)}/{min(len(job_cards), num_jobs)}")
                         
                     except Exception as e:
@@ -382,6 +391,38 @@ class GlassdoorScraper(BaseJobScraper):
         except Exception as e:
             print_error(f"Unexpected error while scraping Glassdoor: {str(e)}")
             raise ScraperError(f"Glassdoor scraping failed: {str(e)}")
+
+    def parse_job_details_page(self, html_content: str) -> Optional[Dict]:
+        """Parse the HTML content of a Glassdoor job details page."""
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+
+            title_element = soup.find(class_="job-title") 
+            title = title_element.text.strip() if title_element else "Unknown Title"
+            if title == "Unknown Title":
+                logger.warning("Could not find job title in HTML")
+                return None
+
+            company_element = soup.find(class_="employer-name")
+            company = company_element.text.strip() if company_element else "Unknown Company"
+            if company == "Unknown Company":
+                logger.warning("Could not find company name in HTML, using placeholder")
+            
+            description_element = soup.find(class_="jobDescriptionContent")
+            description = description_element.text.strip() if description_element else "No description available"
+            if description == "No description available":
+                logger.warning("Could not find job description in HTML")
+                return None
+                
+            return {
+                "site": "glassdoor",
+                "title": title,
+                "company": company,
+                "description": description,
+            }
+        except Exception as e:
+            logger.error(f"Error parsing Glassdoor job details HTML: {str(e)}")
+            return None
 
 def get_scraper(site: str) -> Optional[BaseJobScraper]:
     """Factory function to get the appropriate scraper based on the site."""
