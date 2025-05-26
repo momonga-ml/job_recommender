@@ -1,128 +1,143 @@
-import os
-import json
 import hashlib
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import logging
 
+from sqlalchemy.orm import sessionmaker, Session as SqlaSession
+from sqlalchemy.exc import SQLAlchemyError
+
+from job_recommender.db_schema import CachedSearches
+from job_recommender.db_utils import create_db_engine
+
 logger = logging.getLogger(__name__)
 
 class JobCache:
-    def __init__(self, cache_dir: str = ".cache", cache_duration: int = 24):
+    def __init__(self, cache_duration: int = 24, engine=None):
         """
-        Initialize the job cache.
-        
+        Initialize the job cache using a PostgreSQL database.
+
         Args:
-            cache_dir: Directory to store cache files
-            cache_duration: How long to keep cache entries in hours
+            cache_duration: How long to keep cache entries in hours.
+            engine: Optional SQLAlchemy engine. If None, a new engine
+                    will be created using create_db_engine().
         """
-        self.cache_dir = cache_dir
         self.cache_duration = timedelta(hours=cache_duration)
-        self._ensure_cache_dir()
-        
-    def _ensure_cache_dir(self):
-        """Ensure the cache directory exists."""
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
-            
+        self.engine = engine or create_db_engine()
+        self.Session = sessionmaker(bind=self.engine)
+
     def _get_cache_key(self, site: str, query: str, location: str) -> str:
-        """Generate a unique cache key for the search parameters."""
+        """Generate a unique cache key (search_hash) for the search parameters."""
         key_string = f"{site}:{query}:{location}".lower()
         return hashlib.md5(key_string.encode()).hexdigest()
-        
-    def _get_cache_file(self, cache_key: str) -> str:
-        """Get the path to the cache file for a given key."""
-        return os.path.join(self.cache_dir, f"{cache_key}.json")
-        
+
     def get_cached_jobs(self, site: str, query: str, location: str) -> Optional[List[Dict]]:
         """
-        Retrieve cached jobs if they exist and are not expired.
-        
+        Retrieve cached jobs from the database if they exist and are not expired.
+
         Args:
-            site: Job site name
-            query: Search query
-            location: Location to search in
-            
+            site: Job site name.
+            query: Search query.
+            location: Location to search in.
+
         Returns:
-            List of cached jobs if valid, None otherwise
+            List of cached job dictionaries if a valid cache entry is found, None otherwise.
         """
         cache_key = self._get_cache_key(site, query, location)
-        cache_file = self._get_cache_file(cache_key)
-        
-        if not os.path.exists(cache_file):
-            return None
-            
+        session: SqlaSession = self.Session()
         try:
-            with open(cache_file, 'r', encoding='utf-8') as f:
-                cache_data = json.load(f)
+            cached_entry = session.query(CachedSearches).filter_by(search_hash=cache_key).first()
+
+            if cached_entry:
+                if datetime.utcnow() - cached_entry.timestamp > self.cache_duration:
+                    logger.info(
+                        f"Cache expired for {site} search: {query} in {location} (hash: {cache_key})"
+                    )
+                    # Delete expired entry
+                    session.delete(cached_entry)
+                    session.commit()
+                    return None
                 
-            # Check if cache is expired
-            cache_time = datetime.fromisoformat(cache_data['timestamp'])
-            if datetime.now() - cache_time > self.cache_duration:
-                logger.info(f"Cache expired for {site} search: {query} in {location}")
+                logger.info(
+                    f"Using cached results for {site} search: {query} in {location} (hash: {cache_key})"
+                )
+                return cached_entry.job_data
+            else:
+                logger.debug(f"No cache found for {site} search: {query} in {location} (hash: {cache_key})")
                 return None
-                
-            logger.info(f"Using cached results for {site} search: {query} in {location}")
-            return cache_data['jobs']
-            
-        except Exception as e:
-            logger.error(f"Error reading cache: {str(e)}")
+        except SQLAlchemyError as e:
+            logger.error(f"Database error while getting cached jobs (hash: {cache_key}): {e}")
+            session.rollback()
             return None
-            
+        finally:
+            session.close()
+
     def cache_jobs(self, site: str, query: str, location: str, jobs: List[Dict]):
         """
-        Cache job results.
-        
+        Cache job results in the database. Creates a new entry or updates an existing one.
+
         Args:
-            site: Job site name
-            query: Search query
-            location: Location to search in
-            jobs: List of job dictionaries to cache
+            site: Job site name.
+            query: Search query.
+            location: Location to search in.
+            jobs: List of job dictionaries to cache.
         """
         cache_key = self._get_cache_key(site, query, location)
-        cache_file = self._get_cache_file(cache_key)
-        
+        session: SqlaSession = self.Session()
         try:
-            cache_data = {
-                'timestamp': datetime.now().isoformat(),
-                'site': site,
-                'query': query,
-                'location': location,
-                'jobs': jobs
-            }
+            existing_entry = session.query(CachedSearches).filter_by(search_hash=cache_key).first()
+
+            if existing_entry:
+                existing_entry.timestamp = datetime.utcnow()
+                existing_entry.job_data = jobs
+                logger.info(
+                    f"Updating existing cache for {site} search: {query} in {location} (hash: {cache_key})"
+                )
+            else:
+                new_entry = CachedSearches(
+                    search_hash=cache_key,
+                    site_name=site,
+                    query_string=query,
+                    location_string=location,
+                    timestamp=datetime.utcnow(),
+                    job_data=jobs,
+                )
+                session.add(new_entry)
+                logger.info(
+                    f"Caching {len(jobs)} jobs for {site} search: {query} in {location} (hash: {cache_key})"
+                )
             
-            with open(cache_file, 'w', encoding='utf-8') as f:
-                json.dump(cache_data, f, ensure_ascii=False, indent=2)
-                
-            logger.info(f"Cached {len(jobs)} jobs for {site} search: {query} in {location}")
-            
-        except Exception as e:
-            logger.error(f"Error writing to cache: {str(e)}")
-            
+            session.commit()
+
+        except SQLAlchemyError as e:
+            logger.error(f"Database error while caching jobs (hash: {cache_key}): {e}")
+            session.rollback()
+        finally:
+            session.close()
+
     def clear_cache(self, site: Optional[str] = None):
         """
-        Clear the cache, optionally for a specific site.
-        
+        Clear the cache from the database, optionally for a specific site.
+
         Args:
-            site: Optional site name to clear cache for
+            site: Optional site name to clear cache for. If None, clears all cached searches.
         """
+        session: SqlaSession = self.Session()
         try:
             if site:
-                # Clear cache files for specific site
-                for filename in os.listdir(self.cache_dir):
-                    if filename.endswith('.json'):
-                        cache_file = os.path.join(self.cache_dir, filename)
-                        with open(cache_file, 'r', encoding='utf-8') as f:
-                            cache_data = json.load(f)
-                            if cache_data['site'] == site:
-                                os.remove(cache_file)
-                logger.info(f"Cleared cache for site: {site}")
+                deleted_count = (
+                    session.query(CachedSearches)
+                    .filter(CachedSearches.site_name == site)
+                    .delete(synchronize_session=False)
+                )
+                logger.info(f"Cleared {deleted_count} cache entries for site: {site}")
             else:
-                # Clear all cache files
-                for filename in os.listdir(self.cache_dir):
-                    if filename.endswith('.json'):
-                        os.remove(os.path.join(self.cache_dir, filename))
-                logger.info("Cleared all cache files")
-                
-        except Exception as e:
-            logger.error(f"Error clearing cache: {str(e)}") 
+                deleted_count = session.query(CachedSearches).delete(synchronize_session=False)
+                logger.info(f"Cleared all {deleted_count} cache entries from the database.")
+            
+            session.commit()
+
+        except SQLAlchemyError as e:
+            logger.error(f"Database error while clearing cache: {e}")
+            session.rollback()
+        finally:
+            session.close()

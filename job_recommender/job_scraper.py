@@ -1,10 +1,16 @@
 import os
 import time
-import json
+# import json # No longer directly used for saving jobs
 import click
-from datetime import datetime
+from datetime import datetime, timezone # Added timezone
 from typing import List, Dict, Optional
 from abc import ABC, abstractmethod
+
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError
+from .db_schema import JobDetails
+from .db_utils import create_db_engine
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -23,6 +29,7 @@ from .utils import (
     RateLimitError,
     ScraperTimeoutError
 )
+from .parallel_scraper import ParallelJobScraper # Moved to top
 from .rich_utils import (
     create_progress_bar,
     print_success,
@@ -35,11 +42,13 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 class BaseJobScraper(ABC):
-    def __init__(self, output_dir: str = "job_descriptions"):
-        self.output_dir = output_dir
+    def __init__(self, output_dir: str = "job_descriptions", engine=None): # Added engine
+        self.output_dir = output_dir # Kept for now, but not used by new save_jobs
+        self.engine = engine or create_db_engine()
+        self.Session = sessionmaker(bind=self.engine)
         self.setup_driver()
         self.setup_logging()
-        
+
     def setup_logging(self):
         """Set up logging configuration."""
         if not logger.handlers:
@@ -78,29 +87,72 @@ class BaseJobScraper(ABC):
         pass
     
     def save_jobs(self, jobs: List[Dict]):
-        """Save job descriptions to text files."""
+        """Save job details to the PostgreSQL database."""
+        session = self.Session()
+        saved_count = 0
+        skipped_count = 0
+        error_count = 0
+
         try:
-            if not os.path.exists(self.output_dir):
-                os.makedirs(self.output_dir)
-                
-            for job in jobs:
-                filename = f"{job['site']}_{job['id']}_{datetime.now().strftime('%Y%m%d')}.txt"
-                filepath = os.path.join(self.output_dir, filename)
-                
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(f"Site: {job['site']}\n")
-                    f.write(f"Title: {job['title']}\n")
-                    f.write(f"Company: {job['company']}\n")
-                    f.write(f"URL: {job['url']}\n")
-                    f.write(f"Scraped Date: {job['scraped_date']}\n")
-                    f.write("\nDescription:\n")
-                    f.write(job['description'])
+            for job_dict in jobs:
+                current_search_hash = job_dict.get('search_hash_for_saving')
+                job_url = job_dict.get('url')
+
+                if not job_url:
+                    logger.warning(f"Job dictionary missing 'url'. Skipping: {job_dict.get('title', 'N/A')}")
+                    error_count += 1
+                    continue
+
+                try:
+                    existing_job = session.query(JobDetails).filter_by(url=job_url).first()
+                    if existing_job:
+                        logger.info(f"Job already exists in DB (URL: {job_url}). Skipping.")
+                        skipped_count += 1
+                        continue
+
+                    # Parse and prepare scraped_date
+                    scraped_date_str = job_dict['scraped_date']
+                    dt = datetime.fromisoformat(scraped_date_str)
+                    if dt.tzinfo: # Ensure naive UTC for database
+                        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
                     
-                print_success(f"Saved job description to {filename}")
+                    job_to_save = JobDetails(
+                        job_id=job_dict['id'], # This is the site-specific ID
+                        site_name=job_dict['site'],
+                        title=job_dict['title'],
+                        company=job_dict.get('company'),
+                        description=job_dict['description'],
+                        url=job_url,
+                        location=job_dict.get('location'), # Relies on scraper providing this
+                        scraped_date=dt,
+                        raw_search_hash=current_search_hash
+                    )
+                    session.add(job_to_save)
+                    saved_count += 1
+                    logger.info(f"Successfully prepared job for saving: {job_dict.get('title')} from {job_dict.get('site')}")
+
+                except IntegrityError as e:
+                    session.rollback()
+                    # This might happen if URL is not strictly unique due to a race condition (unlikely with single saver)
+                    # or if job_id (PK) is duplicated across different URLs (schema concern).
+                    logger.error(f"IntegrityError saving job URL {job_url}: {e}. Job ID: {job_dict.get('id')}")
+                    error_count += 1
+                except Exception as e:
+                    session.rollback()
+                    logger.error(f"Error saving job URL {job_url}: {e}")
+                    error_count += 1
+            
+            print_info(f"Job saving summary: {saved_count} saved, {skipped_count} skipped (already exist), {error_count} errors.")
+
         except Exception as e:
-            print_error(f"Failed to save jobs: {str(e)}")
-            raise ScraperError(f"Failed to save jobs: {str(e)}")
-    
+            # General error for the whole save_jobs operation
+            logger.error(f"Critical error during save_jobs: {e}")
+            session.rollback() # Rollback any pending changes not caught by inner try-except
+            raise ScraperError(f"Failed to save jobs to database: {e}")
+        finally:
+            session.close()
+            logger.info("Database session closed after saving jobs.")
+
     def close(self):
         """Close the WebDriver."""
         try:
@@ -415,47 +467,60 @@ def main(ctx):
     num_jobs = ctx.params['num_jobs']
     output_dir = ctx.params['output_dir']
     sites = ctx.params['sites']
-    cache_dir = ctx.params['cache_dir']
+    # cache_dir = ctx.params['cache_dir'] # No longer directly needed by ParallelJobScraper init for DB cache
     cache_duration = ctx.params['cache_duration']
     max_workers = ctx.params['max_workers']
-    clear_cache = ctx.params['clear_cache']
-    clear_cache_site = ctx.params['clear_cache_site']
+    clear_cache_flag = ctx.params['clear_cache'] # Renamed to avoid conflict
+    clear_cache_site_name = ctx.params['clear_cache_site'] # Renamed for clarity
     
     # Initialize parallel scraper
-    scraper = ParallelJobScraper(
-        output_dir=output_dir,
-        cache_dir=cache_dir,
-        cache_duration=cache_duration,
+    # Note: ParallelJobScraper will now use JobCache which uses DB.
+    # JobCache's __init__ might need adjustment if it still expects cache_dir for other reasons,
+    # but for DB-based caching, it's not essential.
+    parallel_scraper = ParallelJobScraper(
+        # output_dir=output_dir, # Not used by ParallelJobScraper directly for saving
+        cache_duration=cache_duration, # Pass to JobCache via ParallelJobScraper
         max_workers=max_workers
+        # engine can be implicitly created by JobCache within ParallelJobScraper
     )
     
+    db_engine = parallel_scraper.engine # Get engine from ParallelJobScraper (assuming it's exposed)
+
     try:
-        # Clear cache if requested
-        if clear_cache:
-            scraper.clear_cache()
-        elif clear_cache_site:
-            scraper.clear_cache(clear_cache_site)
+        # Clear cache if requested (JobCache.clear_cache uses the DB)
+        if clear_cache_flag:
+            parallel_scraper.clear_cache() # Assumes ParallelJobScraper exposes this from its JobCache
+        elif clear_cache_site_name:
+            parallel_scraper.clear_cache(clear_cache_site_name)
             
         # Scrape jobs in parallel
         print_info(f"Starting parallel scraping from {len(sites)} sites...")
-        all_jobs = scraper.scrape_jobs(sites, query, location, num_jobs)
+        # scrape_jobs in ParallelJobScraper should now ensure 'search_hash_for_saving' is in job dicts
+        all_jobs = parallel_scraper.scrape_jobs(sites, query, location, num_jobs)
         
         if all_jobs:
-            # Save all jobs
-            scraper = IndeedScraper(output_dir=output_dir)
+            # Save all jobs to DB
+            # Pass the engine obtained from parallel_scraper to the saving_scraper instance
+            # output_dir is still passed but won't be used by the new save_jobs
+            saving_scraper = IndeedScraper(output_dir=output_dir, engine=db_engine) 
             try:
-                scraper.save_jobs(all_jobs)
-                print_success(f"\nTotal jobs scraped: {len(all_jobs)}")
+                print_info(f"Attempting to save {len(all_jobs)} jobs to the database...")
+                saving_scraper.save_jobs(all_jobs) # This now saves to DB
+                # Success/error messages are now handled within save_jobs
             except Exception as e:
-                print_error(f"Failed to save jobs: {str(e)}")
+                # This will catch errors from save_jobs if they are re-raised (like ScraperError)
+                print_error(f"Failed to save jobs to database: {str(e)}")
             finally:
-                scraper.close()
+                saving_scraper.close() # Closes WebDriver for the saving_scraper instance
         else:
             print_warning("No jobs found matching the criteria.")
             
     except Exception as e:
-        print_error(f"Unexpected error: {str(e)}")
+        print_error(f"Unexpected error in main: {str(e)}")
+        # Consider if parallel_scraper's WebDriver needs closing if an error occurs before saving_scraper is used
+        # For now, assume WebDriver cleanup is handled by individual scraper instances or context managers if used
         raise
 
 if __name__ == "__main__":
-    main() 
+    # from .parallel_scraper import ParallelJobScraper # Already moved to top
+    main()

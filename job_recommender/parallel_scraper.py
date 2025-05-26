@@ -34,69 +34,93 @@ class ParallelJobScraper:
             cache_duration: How long to keep cache entries in hours
             max_workers: Maximum number of parallel scraping workers
         """
-        self.output_dir = output_dir
-        self.cache = JobCache(cache_dir, cache_duration)
+        self.output_dir = output_dir # Kept for BaseJobScraper instances, not directly used by ParallelJobScraper for saving
+        # JobCache now takes cache_duration and optional engine. cache_dir is removed for DB ops.
+        self.cache = JobCache(cache_duration=cache_duration) 
+        self.engine = self.cache.engine # Expose engine from JobCache
         self.max_workers = max_workers
         
     def _scrape_site(
         self,
         site: str,
         query: str,
-        location: str,
+        location: str, # This is the search location
         num_jobs: int,
-        progress_bar: Optional[Progress] = None
+        progress_bar: Optional['Progress'] = None # Use quotes if Progress not imported/defined here
     ) -> List[Dict]:
         """
-        Scrape jobs from a single site.
+        Scrape jobs from a single site, adding search_hash and ensuring location for saving.
         
         Args:
             site: Job site name
             query: Search query
-            location: Location to search in
+            location: Location searched in (used as default for job_dict if not otherwise specified)
             num_jobs: Number of jobs to scrape
             progress_bar: Optional progress bar to update
             
         Returns:
-            List of scraped jobs
+            List of scraped/cached jobs, each with 'search_hash_for_saving' and 'location' keys.
         """
+        search_hash = self.cache._get_cache_key(site, query, location)
+        retrieved_jobs: List[Dict] = [] # Ensure it's always a list
+
         # Check cache first
-        cached_jobs = self.cache.get_cached_jobs(site, query, location)
-        if cached_jobs:
-            if progress_bar:
+        cached_jobs_data = self.cache.get_cached_jobs(site, query, location)
+        if cached_jobs_data:
+            if progress_bar and hasattr(progress_bar, 'task_ids') and progress_bar.task_ids:
                 progress_bar.update(progress_bar.task_ids[0], completed=1)
                 progress_bar.update(progress_bar.task_ids[0], description=f"[green]Using cached results from {site}")
-            print_success(f"Using cached results from {site}")
-            return cached_jobs[:num_jobs]
+            print_success(f"Using cached results from {site} for query: '{query}', location: '{location}'")
+            # Add search_hash and ensure location for each job from cache
+            for job_data in cached_jobs_data[:num_jobs]:
+                job_data['search_hash_for_saving'] = search_hash
+                # Use job's own location if present, else default to search location
+                job_data['location'] = job_data.get('location', location) 
+            retrieved_jobs = cached_jobs_data[:num_jobs]
+            return retrieved_jobs
             
         # If not in cache, scrape the site
-        scraper_class = get_scraper(site)
+        scraper_class = get_scraper(site) # Returns the specific scraper class
         if not scraper_class:
             print_warning(f"Unsupported job site: {site}")
-            if progress_bar:
+            if progress_bar and hasattr(progress_bar, 'task_ids') and progress_bar.task_ids:
                 progress_bar.update(progress_bar.task_ids[0], completed=1)
-            return []
+            return [] # Return empty list
             
-        scraper = scraper_class(output_dir=self.output_dir)
+        # Instantiate the specific scraper, passing the shared engine
+        scraper_instance = scraper_class(output_dir=self.output_dir, engine=self.engine)
         try:
-            if progress_bar:
-                progress_bar.update(progress_bar.task_ids[0], description=f"[yellow]Scraping {site}")
-            print_info(f"Starting to scrape {site}")
-            jobs = scraper.scrape_jobs(query, location, num_jobs)
-            # Cache the results
-            self.cache.cache_jobs(site, query, location, jobs)
-            if progress_bar:
+            if progress_bar and hasattr(progress_bar, 'task_ids') and progress_bar.task_ids:
+                progress_bar.update(progress_bar.task_ids[0], description=f"[yellow]Scraping {site} for '{query}'")
+            print_info(f"Starting to scrape {site} for query: '{query}', location: '{location}'")
+            
+            # Get jobs from the specific scraper
+            scraped_job_list = scraper_instance.scrape_jobs(query, location, num_jobs)
+            
+            # Add search_hash and ensure location for each scraped job
+            for job_data in scraped_job_list:
+                job_data['search_hash_for_saving'] = search_hash
+                # Use job's own location if present, else default to search location
+                job_data['location'] = job_data.get('location', location) 
+            
+            # Cache the processed results (now including search_hash_for_saving and location)
+            # Note: cache_jobs in JobCache expects List[Dict] where Dict is the job data.
+            self.cache.cache_jobs(site, query, location, scraped_job_list)
+
+            if progress_bar and hasattr(progress_bar, 'task_ids') and progress_bar.task_ids:
                 progress_bar.update(progress_bar.task_ids[0], completed=1)
                 progress_bar.update(progress_bar.task_ids[0], description=f"[green]Completed {site}")
-            print_success(f"Completed scraping {len(jobs)} jobs from {site}")
-            return jobs
+            print_success(f"Completed scraping {len(scraped_job_list)} jobs from {site} for query: '{query}', loc: '{location}'")
+            retrieved_jobs = scraped_job_list
+            return retrieved_jobs
         except Exception as e:
-            print_error(f"Error scraping {site}: {str(e)}")
-            if progress_bar:
+            print_error(f"Error scraping {site} for query: '{query}', loc: '{location}': {str(e)}")
+            if progress_bar and hasattr(progress_bar, 'task_ids') and progress_bar.task_ids:
                 progress_bar.update(progress_bar.task_ids[0], completed=1)
                 progress_bar.update(progress_bar.task_ids[0], description=f"[red]Failed {site}")
-            return []
+            return [] # Return empty list on error
         finally:
-            scraper.close()
+            scraper_instance.close() # Close WebDriver of the individual scraper
             
     def scrape_jobs(
         self,
