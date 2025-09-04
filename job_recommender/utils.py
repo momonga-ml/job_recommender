@@ -9,12 +9,10 @@ from selenium.common.exceptions import (
     ElementClickInterceptedException
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Import logging configuration
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class ScraperError(Exception):
     """Base exception for scraper-related errors."""

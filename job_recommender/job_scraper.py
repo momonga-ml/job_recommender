@@ -14,6 +14,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from .rich_utils import create_progress_bar
 import logging
 from .utils import (
     retry_on_exception,
@@ -24,13 +25,12 @@ from .utils import (
     ScraperTimeoutError
 )
 from .rich_utils import (
-    create_progress_bar,
     print_success,
     print_warning,
     print_error,
     print_info
 )
-from tqdm import tqdm
+# tqdm is imported but rich progress bars are used instead
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +42,8 @@ class BaseJobScraper(ABC):
         
     def setup_logging(self):
         """Set up logging configuration."""
-        if not logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
+        from .logging_config import get_logger
+        self.logger = get_logger(f"{__name__}.{self.__class__.__name__}")
         
     def setup_driver(self):
         """Set up the Chrome WebDriver with appropriate options."""
@@ -383,15 +380,6 @@ class GlassdoorScraper(BaseJobScraper):
             print_error(f"Unexpected error while scraping Glassdoor: {str(e)}")
             raise ScraperError(f"Glassdoor scraping failed: {str(e)}")
 
-def get_scraper(site: str) -> Optional[BaseJobScraper]:
-    """Factory function to get the appropriate scraper based on the site."""
-    scrapers = {
-        "indeed": IndeedScraper,
-        "linkedin": LinkedInScraper,
-        "glassdoor": GlassdoorScraper
-    }
-    return scrapers.get(site.lower())
-
 @click.command()
 @click.option('--query', required=True, help='Job search query')
 @click.option('--location', required=True, help='Location for job search')
@@ -404,22 +392,14 @@ def get_scraper(site: str) -> Optional[BaseJobScraper]:
 @click.option('--max-workers', default=3, help='Maximum number of parallel scraping workers')
 @click.option('--clear-cache', is_flag=True, help='Clear the cache before scraping')
 @click.option('--clear-cache-site', help='Clear cache for a specific site')
-def main(ctx):
+def main(query, location, num_jobs, output_dir, sites, log_level, cache_dir, cache_duration, max_workers, clear_cache, clear_cache_site):
     """Scrape job descriptions from multiple job sites and save them to text files."""
-    # Set up logging level
-    logging.getLogger().setLevel(getattr(logging, ctx.params['log_level'].upper()))
+    # Import ParallelJobScraper here to avoid circular imports
+    from .parallel_scraper import ParallelJobScraper
+    from .logging_config import setup_logging
     
-    # Get parameters from context
-    query = ctx.params['query']
-    location = ctx.params['location']
-    num_jobs = ctx.params['num_jobs']
-    output_dir = ctx.params['output_dir']
-    sites = ctx.params['sites']
-    cache_dir = ctx.params['cache_dir']
-    cache_duration = ctx.params['cache_duration']
-    max_workers = ctx.params['max_workers']
-    clear_cache = ctx.params['clear_cache']
-    clear_cache_site = ctx.params['clear_cache_site']
+    # Set up comprehensive logging
+    setup_logging(log_level=log_level, log_to_console=False)  # Rich handles console output
     
     # Initialize parallel scraper
     scraper = ParallelJobScraper(
@@ -442,14 +422,14 @@ def main(ctx):
         
         if all_jobs:
             # Save all jobs
-            scraper = IndeedScraper(output_dir=output_dir)
             try:
                 scraper.save_jobs(all_jobs)
                 print_success(f"\nTotal jobs scraped: {len(all_jobs)}")
             except Exception as e:
                 print_error(f"Failed to save jobs: {str(e)}")
             finally:
-                scraper.close()
+                # ParallelJobScraper handles cleanup automatically
+                pass
         else:
             print_warning("No jobs found matching the criteria.")
             

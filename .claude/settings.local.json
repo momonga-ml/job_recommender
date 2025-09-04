@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(npx create-react-app:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(grep:*)",
+      "Bash(npm ls:*)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" --version)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pip install pytest)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pytest tests/ -v)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pip install -r requirements.txt)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pip install redis pypdf)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pytest tests/test_job_scraper.py -v)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pytest tests/test_job_analyzer.py -v)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pytest test_basic_functionality.py -v)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pytest tests/test_job_analyzer.py::TestJobAnalyzer::test_init tests/test_job_analyzer.py::TestJobAnalyzer::test_read_job_descriptions tests/test_job_analyzer.py::TestJobAnalyzer::test_extract_skills tests/test_job_analyzer.py::TestJobAnalyzer::test_read_resume_txt -v)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m job_recommender.job_analyzer --help)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m job_recommender.job_scraper --help)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pytest tests/test_job_scraper.py::TestIndeedScraper::test_scrape_jobs_success -v)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pytest tests/test_job_analyzer.py::TestJobAnalyzer::test_read_resume_pdf -v)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pytest tests/ test_basic_functionality.py -x -v)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pytest tests/ test_basic_functionality.py --tb=no)",
+      "Bash(\"/c/Users/charl/AppData/Local/Microsoft/WindowsApps/python.exe\" -m pytest tests/test_job_scraper.py::test_full_scraping_process -v)"
+    ],
+    "deny": [],
+    "ask": [],
+    "additionalDirectories": [
+      "C:\\c\\Users\\charl\\Documents",
+      "C:\\c\\Users\\charl\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313",
+      "C:\\c\\Users\\charl\\AppData\\Local\\Programs"
+    ]
+  }
+}

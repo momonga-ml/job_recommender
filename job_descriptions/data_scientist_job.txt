@@ -1,0 +1,37 @@
+Site: indeed
+Title: Data Scientist
+Company: TechCorp Inc.
+URL: https://indeed.com/viewjob?jk=sample123
+Scraped Date: 2024-01-01T10:00:00
+
+Description:
+Data Scientist Position - Join Our AI Team!
+
+We are seeking a talented Data Scientist to drive insights and innovation through advanced analytics and machine learning.
+
+Key Requirements:
+- Python and R programming expertise
+- Experience with machine learning frameworks (scikit-learn, TensorFlow, PyTorch)
+- Strong statistical analysis skills
+- Knowledge of SQL and database systems
+- Experience with data visualization tools (Tableau, PowerBI, matplotlib)
+- Understanding of cloud platforms (AWS, GCP, Azure)
+- Strong mathematical background in statistics and linear algebra
+- Experience with big data technologies (Spark, Hadoop)
+- Knowledge of A/B testing methodologies
+- Experience with feature engineering and model deployment
+
+Responsibilities:
+- Build predictive models and machine learning algorithms
+- Analyze large datasets to identify trends and patterns
+- Create data visualizations and reports for stakeholders
+- Collaborate with engineering teams to deploy models in production
+- Design and analyze experiments
+- Communicate findings to technical and non-technical audiences
+
+Qualifications:
+- Master's or PhD in Data Science, Statistics, Computer Science, or related field
+- 3+ years of experience in data science or analytics roles
+- Strong problem-solving and critical thinking skills
+- Experience with version control (Git) and collaborative development
+- Knowledge of software engineering best practices

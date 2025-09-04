@@ -9,9 +9,9 @@ from job_recommender.job_scraper import (
     IndeedScraper,
     LinkedInScraper,
     GlassdoorScraper,
-    get_scraper,
     main
 )
+from job_recommender.scraper_factory import get_scraper
 from typing import List, Dict
 
 # Sample job data for testing
@@ -28,7 +28,7 @@ SAMPLE_JOB_DATA = {
 @pytest.fixture
 def mock_driver():
     """Create a mock Selenium WebDriver."""
-    with patch('selenium.webdriver.Chrome') as mock_chrome:
+    with patch('job_recommender.job_scraper.webdriver.Chrome') as mock_chrome:
         driver = MagicMock()
         mock_chrome.return_value = driver
         yield driver
@@ -36,10 +36,10 @@ def mock_driver():
 @pytest.fixture
 def mock_webdriver_wait():
     """Mock WebDriverWait for testing."""
-    with patch('selenium.webdriver.support.ui.WebDriverWait') as mock_wait:
-        wait = MagicMock()
-        mock_wait.return_value = wait
-        yield wait
+    with patch('job_recommender.job_scraper.WebDriverWait') as mock_wait:
+        wait_instance = MagicMock()
+        mock_wait.return_value = wait_instance
+        yield wait_instance
 
 @pytest.fixture
 def temp_output_dir(tmp_path):
@@ -96,39 +96,28 @@ class TestIndeedScraper:
         mock_company.text = "Test Company"
         mock_description.text = "Test job description"
         
-        # Setup find_element calls with correct class names
-        mock_driver.find_element.side_effect = [
-            mock_title,  # jobsearch-JobInfoHeader-title
-            mock_company,  # jobsearch-CompanyInfoContainer
-            mock_description  # jobDescriptionText
+        # Setup WebDriverWait to return job cards first, then wait for job details
+        mock_webdriver_wait.until.side_effect = [
+            [mock_card],  # First call: presence_of_all_elements_located for job cards
+            mock_title,   # Second call: presence_of_element_located for job details
         ]
-        mock_driver.current_url = "https://indeed.com/viewjob?jk=test123"
         
-        # Setup WebDriverWait mock
-        mock_webdriver_wait.until.return_value = [mock_card]
-        
-        # Mock the click method
-        mock_card.click = MagicMock()
-        
-        # Mock the get method
+        # Mock driver methods
         mock_driver.get = MagicMock()
+        mock_driver.current_url = "https://indeed.com/viewjob/test123?jk=test123"
+        mock_driver.execute_script = MagicMock()
         
-        # Mock the find_element method with correct class names
+        # Mock find_element calls in sequence (title, company, description)
         mock_driver.find_element.side_effect = [
-            mock_title,  # jobsearch-JobInfoHeader-title
-            mock_company,  # jobsearch-CompanyInfoContainer
-            mock_description  # jobDescriptionText
+            mock_title,
+            mock_company, 
+            mock_description
         ]
         
-        # Mock the find_element_by_class_name method
-        mock_driver.find_element_by_class_name = MagicMock(side_effect=[
-            mock_title,  # jobsearch-JobInfoHeader-title
-            mock_company,  # jobsearch-CompanyInfoContainer
-            mock_description  # jobDescriptionText
-        ])
-        
-        scraper = IndeedScraper(output_dir=temp_output_dir)
-        jobs = scraper.scrape_jobs("software engineer", "New York", 1)
+        # Mock safe_click to return True
+        with patch('job_recommender.job_scraper.safe_click', return_value=True):
+            scraper = IndeedScraper(output_dir=temp_output_dir)
+            jobs = scraper.scrape_jobs("software engineer", "New York", 1)
         
         assert len(jobs) == 1
         assert jobs[0]["site"] == "indeed"
@@ -139,12 +128,14 @@ class TestIndeedScraper:
 
     def test_scrape_jobs_timeout(self, mock_driver, mock_webdriver_wait):
         """Test handling of timeout during job scraping."""
+        from job_recommender.utils import ScraperTimeoutError
+        
         mock_webdriver_wait.until.side_effect = TimeoutException()
         
         scraper = IndeedScraper()
-        jobs = scraper.scrape_jobs("software engineer", "New York", 1)
         
-        assert len(jobs) == 0
+        with pytest.raises(ScraperTimeoutError):
+            scraper.scrape_jobs("software engineer", "New York", 1)
 
 class TestLinkedInScraper:
     def test_scrape_jobs_success(self, mock_driver, mock_webdriver_wait, temp_output_dir):
@@ -159,32 +150,28 @@ class TestLinkedInScraper:
         mock_company.text = "Tech Corp"
         mock_description.text = "Test job description"
         
-        # Setup find_element calls with correct class names
-        mock_driver.find_element.side_effect = [
-            mock_title,  # jobs-unified-top-card__job-title
-            mock_company,  # jobs-unified-top-card__company-name
-            mock_description  # jobs-description__content
+        # Setup WebDriverWait to return job cards first, then wait for job details
+        mock_webdriver_wait.until.side_effect = [
+            [mock_card],  # First call: presence_of_all_elements_located for job cards
+            mock_title,   # Second call: presence_of_element_located for job details
         ]
-        mock_driver.current_url = "https://linkedin.com/jobs/view/123456"
         
-        # Setup WebDriverWait mock
-        mock_webdriver_wait.until.return_value = [mock_card]
-        
-        # Mock the click method
-        mock_card.click = MagicMock()
-        
-        # Mock the get method
+        # Mock driver methods
         mock_driver.get = MagicMock()
+        mock_driver.current_url = "https://linkedin.com/jobs/view/123456?trackingId=xyz"
+        mock_driver.execute_script = MagicMock()
         
-        # Mock the find_element_by_class_name method
-        mock_driver.find_element_by_class_name = MagicMock(side_effect=[
-            mock_title,  # jobs-unified-top-card__job-title
-            mock_company,  # jobs-unified-top-card__company-name
-            mock_description  # jobs-description__content
-        ])
+        # Mock find_element calls in sequence (title, company, description)
+        mock_driver.find_element.side_effect = [
+            mock_title,
+            mock_company, 
+            mock_description
+        ]
         
-        scraper = LinkedInScraper(output_dir=temp_output_dir)
-        jobs = scraper.scrape_jobs("senior developer", "San Francisco", 1)
+        # Mock safe_click to return True
+        with patch('job_recommender.job_scraper.safe_click', return_value=True):
+            scraper = LinkedInScraper(output_dir=temp_output_dir)
+            jobs = scraper.scrape_jobs("senior developer", "San Francisco", 1)
         
         assert len(jobs) == 1
         assert jobs[0]["site"] == "linkedin"
@@ -206,32 +193,28 @@ class TestGlassdoorScraper:
         mock_company.text = "Startup Inc"
         mock_description.text = "Test job description"
         
-        # Setup find_element calls with correct class names
-        mock_driver.find_element.side_effect = [
-            mock_title,  # job-title
-            mock_company,  # employer-name
-            mock_description  # jobDescriptionContent
+        # Setup WebDriverWait to return job cards first, then wait for job details
+        mock_webdriver_wait.until.side_effect = [
+            [mock_card],  # First call: presence_of_all_elements_located for job cards
+            mock_title,   # Second call: presence_of_element_located for job details
         ]
-        mock_driver.current_url = "https://glassdoor.com/job-listing/product-manager-startup-inc-JV_123456"
         
-        # Setup WebDriverWait mock
-        mock_webdriver_wait.until.return_value = [mock_card]
-        
-        # Mock the click method
-        mock_card.click = MagicMock()
-        
-        # Mock the get method
+        # Mock driver methods
         mock_driver.get = MagicMock()
+        mock_driver.current_url = "https://glassdoor.com/job-listing/product-manager/startup-inc/JV_123456?source=search"
+        mock_driver.execute_script = MagicMock()
         
-        # Mock the find_element_by_class_name method
-        mock_driver.find_element_by_class_name = MagicMock(side_effect=[
-            mock_title,  # job-title
-            mock_company,  # employer-name
-            mock_description  # jobDescriptionContent
-        ])
+        # Mock find_element calls in sequence (title, company, description)
+        mock_driver.find_element.side_effect = [
+            mock_title,
+            mock_company, 
+            mock_description
+        ]
         
-        scraper = GlassdoorScraper(output_dir=temp_output_dir)
-        jobs = scraper.scrape_jobs("product manager", "Boston", 1)
+        # Mock safe_click to return True
+        with patch('job_recommender.job_scraper.safe_click', return_value=True):
+            scraper = GlassdoorScraper(output_dir=temp_output_dir)
+            jobs = scraper.scrape_jobs("product manager", "Boston", 1)
         
         assert len(jobs) == 1
         assert jobs[0]["site"] == "glassdoor"
@@ -256,13 +239,12 @@ def test_get_scraper():
 @pytest.mark.integration
 def test_full_scraping_process(temp_output_dir):
     """Integration test for the full scraping process."""
-    with patch('job_recommender.job_scraper.IndeedScraper') as mock_indeed_scraper, \
-         patch('job_recommender.job_scraper.LinkedInScraper') as mock_linkedin_scraper, \
+    with patch('job_recommender.parallel_scraper.ParallelJobScraper') as mock_parallel_scraper, \
          patch('click.echo') as mock_echo:
         
-        # Setup mock scrapers
-        mock_indeed_scraper.return_value.scrape_jobs.return_value = [SAMPLE_JOB_DATA]
-        mock_linkedin_scraper.return_value.scrape_jobs.return_value = [SAMPLE_JOB_DATA]
+        # Setup mock parallel scraper
+        mock_parallel_instance = mock_parallel_scraper.return_value
+        mock_parallel_instance.scrape_jobs.return_value = [SAMPLE_JOB_DATA, SAMPLE_JOB_DATA]
         
         # Create a Click test runner
         runner = CliRunner()
@@ -273,20 +255,21 @@ def test_full_scraping_process(temp_output_dir):
             '--location', 'New York',
             '--num-jobs', '1',
             '--output-dir', temp_output_dir,
-            '--sites', 'indeed', 'linkedin'
+            '--sites', 'indeed',
+            '--sites', 'linkedin'
         ])
         
         # Check if command executed successfully
         assert result.exit_code == 0
         
-        # Check if files were created
-        files = os.listdir(temp_output_dir)
-        assert len(files) == 2
+        # Verify the parallel scraper was called with correct arguments
+        mock_parallel_scraper.assert_called_once()
+        mock_parallel_instance.scrape_jobs.assert_called_once_with(
+            ('indeed', 'linkedin'), 
+            'software engineer', 
+            'New York', 
+            1
+        )
         
-        # Verify file contents
-        for file in files:
-            with open(os.path.join(temp_output_dir, file), 'r', encoding='utf-8') as f:
-                content = f.read()
-                assert "Test Job Title" in content
-                assert "Test Company" in content
-                assert "Test job description" in content 
+        # Since we're now testing the mock, we should also verify save_jobs was called
+        mock_parallel_instance.save_jobs.assert_called_once_with([SAMPLE_JOB_DATA, SAMPLE_JOB_DATA])

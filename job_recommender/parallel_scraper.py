@@ -2,8 +2,10 @@ import concurrent.futures
 from typing import List, Dict, Optional
 import logging
 import time
-from .job_scraper import get_scraper, BaseJobScraper
+from .job_scraper import IndeedScraper
+from .scraper_factory import get_scraper
 from .cache import JobCache
+from rich.progress import Progress
 from .rich_utils import (
     create_progress_bar,
     print_success,
@@ -43,8 +45,7 @@ class ParallelJobScraper:
         site: str,
         query: str,
         location: str,
-        num_jobs: int,
-        progress_bar: Optional[Progress] = None
+        num_jobs: int
     ) -> List[Dict]:
         """
         Scrape jobs from a single site.
@@ -54,7 +55,6 @@ class ParallelJobScraper:
             query: Search query
             location: Location to search in
             num_jobs: Number of jobs to scrape
-            progress_bar: Optional progress bar to update
             
         Returns:
             List of scraped jobs
@@ -62,9 +62,6 @@ class ParallelJobScraper:
         # Check cache first
         cached_jobs = self.cache.get_cached_jobs(site, query, location)
         if cached_jobs:
-            if progress_bar:
-                progress_bar.update(progress_bar.task_ids[0], completed=1)
-                progress_bar.update(progress_bar.task_ids[0], description=f"[green]Using cached results from {site}")
             print_success(f"Using cached results from {site}")
             return cached_jobs[:num_jobs]
             
@@ -72,28 +69,18 @@ class ParallelJobScraper:
         scraper_class = get_scraper(site)
         if not scraper_class:
             print_warning(f"Unsupported job site: {site}")
-            if progress_bar:
-                progress_bar.update(progress_bar.task_ids[0], completed=1)
             return []
             
         scraper = scraper_class(output_dir=self.output_dir)
         try:
-            if progress_bar:
-                progress_bar.update(progress_bar.task_ids[0], description=f"[yellow]Scraping {site}")
             print_info(f"Starting to scrape {site}")
             jobs = scraper.scrape_jobs(query, location, num_jobs)
             # Cache the results
             self.cache.cache_jobs(site, query, location, jobs)
-            if progress_bar:
-                progress_bar.update(progress_bar.task_ids[0], completed=1)
-                progress_bar.update(progress_bar.task_ids[0], description=f"[green]Completed {site}")
             print_success(f"Completed scraping {len(jobs)} jobs from {site}")
             return jobs
         except Exception as e:
             print_error(f"Error scraping {site}: {str(e)}")
-            if progress_bar:
-                progress_bar.update(progress_bar.task_ids[0], completed=1)
-                progress_bar.update(progress_bar.task_ids[0], description=f"[red]Failed {site}")
             return []
         finally:
             scraper.close()
@@ -135,8 +122,7 @@ class ParallelJobScraper:
                         site,
                         query,
                         location,
-                        num_jobs,
-                        progress
+                        num_jobs
                     ): site for site in sites
                 }
                 
@@ -173,3 +159,17 @@ class ParallelJobScraper:
             print_success(f"Cleared cache for site: {site}")
         else:
             print_success("Cleared all cache files") 
+            
+    def save_jobs(self, jobs: List[Dict]):
+        """
+        Save job descriptions to text files.
+        
+        Args:
+            jobs: List of job dictionaries to save
+        """
+        # Create a temporary scraper to use its save_jobs method
+        scraper = IndeedScraper(output_dir=self.output_dir)
+        try:
+            scraper.save_jobs(jobs)
+        finally:
+            scraper.close()

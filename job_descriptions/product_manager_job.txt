@@ -1,0 +1,40 @@
+Site: linkedin
+Title: Senior Product Manager
+Company: Innovation Labs
+URL: https://linkedin.com/jobs/view/456789
+Scraped Date: 2024-01-01T11:00:00
+
+Description:
+Senior Product Manager - Drive Product Strategy & Growth
+
+We're looking for an experienced Product Manager to lead our product development initiatives and drive business growth.
+
+Essential Skills:
+- Product management methodologies (Agile, Lean, Design Thinking)
+- Strong analytical and data-driven decision making
+- Experience with product analytics tools (Google Analytics, Mixpanel, Amplitude)
+- Knowledge of UX/UI principles and user research methods
+- Project management skills and tools (Jira, Asana, Trello)
+- Market research and competitive analysis experience
+- Strong communication and stakeholder management
+- Experience with A/B testing and experimentation
+- Understanding of software development lifecycle
+- Business strategy and go-to-market planning
+
+Core Responsibilities:
+- Define product vision, strategy, and roadmap
+- Conduct market research and competitive analysis
+- Work closely with engineering, design, and marketing teams
+- Gather and prioritize product and customer requirements
+- Define success metrics and track product performance
+- Manage product launches and go-to-market strategies
+- Present to executive leadership and key stakeholders
+
+Requirements:
+- Bachelor's degree in Business, Engineering, or related field
+- MBA preferred
+- 5+ years of product management experience
+- Experience in technology/software companies
+- Strong leadership and team collaboration skills
+- Excellent written and verbal communication
+- Data-driven mindset with strong analytical skills

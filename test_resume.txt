@@ -1,0 +1,27 @@
+John Doe
+Software Engineer
+Email: john.doe@email.com
+Phone: (555) 123-4567
+
+SKILLS:
+- Python, JavaScript, Java, C++
+- Django, Flask, React, Node.js
+- PostgreSQL, MySQL, MongoDB
+- AWS, Docker, Kubernetes
+- Git, Jenkins, CI/CD
+
+EXPERIENCE:
+Software Engineer, Tech Corp (2020-Present)
+- Developed web applications using Python and Django
+- Built REST APIs serving 100K+ requests per day
+- Implemented automated testing and CI/CD pipelines
+- Collaborated with cross-functional teams
+
+Junior Developer, StartupXYZ (2018-2020)  
+- Created responsive web interfaces with React and JavaScript
+- Optimized database queries reducing load time by 40%
+- Participated in Agile development processes
+
+EDUCATION:
+Bachelor of Science in Computer Science
+University of Technology (2014-2018)

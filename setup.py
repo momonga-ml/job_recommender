@@ -13,6 +13,8 @@ setup(
         "PyPDF2>=3.0.0",
         "selenium>=4.0.0",
         "webdriver-manager>=3.8.0",
+        "rich>=14.0.0",
+        "tqdm>=4.62.0",
     ],
     extras_require={
         "dev": [
